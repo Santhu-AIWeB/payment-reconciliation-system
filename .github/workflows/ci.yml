@@ -44,7 +44,7 @@ jobs:
         run: |
           curl --fail http://localhost:8000/api/dashboard/summary
 
-            - name: Seed ML history
+      - name: Seed ML history
         env:
           MONGODB_URI: mongodb://localhost:27017
           DB_NAME: payment_reconciliation_db
