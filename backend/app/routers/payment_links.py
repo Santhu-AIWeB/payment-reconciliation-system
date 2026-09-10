@@ -2,6 +2,9 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from backend.app.events.schemas import EventType, PaymentEvent
+from backend.app.events.service import publish_event
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from pymongo.errors import DuplicateKeyError, PyMongoError
@@ -155,22 +158,45 @@ def create_payment_link(
         links_collection.insert_one(link_doc)
     except DuplicateKeyError:
         try:
-            transactions_collection.delete_one({"transaction_id": transaction_id})
+            transactions_collection.delete_one(
+                {"transaction_id": transaction_id}
+            )
         except PyMongoError:
             pass
+
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Unable to create a unique payment link. Please retry.",
         )
     except PyMongoError as err:
         try:
-            transactions_collection.delete_one({"transaction_id": transaction_id})
+            transactions_collection.delete_one(
+                {"transaction_id": transaction_id}
+            )
         except PyMongoError:
             pass
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database error while creating payment link: {str(err)}",
         )
+
+    # Phase 2B.1:
+    # Publish PAYMENT_CREATED only after the transaction and
+    # payment link have been successfully persisted.
+    event = PaymentEvent(
+        event_id=f"EVT-{uuid.uuid4().hex[:12].upper()}",
+        event_type=EventType.PAYMENT_CREATED,
+        transaction_id=transaction_id,
+        payload={
+            "amount": transaction_doc["amount"],
+            "currency": transaction_doc["currency"],
+            "link_id": link_id,
+        },
+        correlation_id=transaction_id,
+    )
+
+    publish_event(event)
 
     return link_doc
 
@@ -183,6 +209,7 @@ def get_all_payment_links(
     collection=Depends(get_payment_links_collection),
 ):
     """Retrieve all payment links for the admin dashboard."""
+
     try:
         docs = collection.find(
             {},
@@ -268,7 +295,10 @@ def process_payment(
     """
 
     try:
-        link = links_collection.find_one({"link_id": link_id}, {"_id": 0})
+        link = links_collection.find_one(
+            {"link_id": link_id},
+            {"_id": 0},
+        )
 
         if not link:
             raise HTTPException(
@@ -284,13 +314,16 @@ def process_payment(
 
         now = datetime.now(timezone.utc)
         expires_at = link.get("expires_at")
+
         if expires_at is not None:
             expires_at = normalize_utc_datetime(expires_at)
+
             if expires_at <= now:
                 links_collection.update_one(
                     {"link_id": link_id},
                     {"$set": {"status": PaymentLinkStatus.EXPIRED.value}},
                 )
+
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Payment link has expired.",
@@ -339,7 +372,12 @@ def process_payment(
             "reason": state["reason"],
             "action_required": state["action_required"],
             "created_at": now,
-            "resolved_at": now if state["reconciliation_status"] == ReconciliationStatus.MATCHED.value else None,
+            "resolved_at": (
+                now
+                if state["reconciliation_status"]
+                == ReconciliationStatus.MATCHED.value
+                else None
+            ),
         }
 
         gateway_collection.insert_one(gateway_doc)
