@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.database import init_db
+from backend.app.events.service import init_event_indexes
 from backend.app.routers import (
     audit,
     transactions,
@@ -24,6 +25,7 @@ async def lifespan(app: FastAPI):
     Application startup and shutdown.
     """
     init_db()
+    init_event_indexes()
     yield
 
 

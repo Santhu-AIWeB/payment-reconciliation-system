@@ -158,3 +158,94 @@ Working tree should remain clean after each completed checkpoint.
 ## Next Exact Step
 
 Inspect and design the event model before changing existing payment workflows.
+
+
+
+## Phase 2A - Event Model Foundation - COMPLETED
+
+Completed on 2026-09-10.
+
+### Added
+
+- backend/app/events/__init__.py
+- backend/app/events/schemas.py
+- backend/app/events/service.py
+
+### Event Types
+
+- PAYMENT_CREATED
+- GATEWAY_PROCESSED
+- BANK_PROCESSED
+- RECONCILIATION_REQUIRED
+- REFUND_REQUIRED
+- RETRY_REQUIRED
+- INVESTIGATION_REQUIRED
+
+### Event Lifecycle
+
+- PENDING
+- PROCESSING
+- COMPLETED
+- FAILED
+
+### Event Fields
+
+- event_id
+- event_type
+- transaction_id
+- payload
+- status
+- correlation_id
+- created_at
+- processed_at
+- retry_count
+- error_message
+
+### MongoDB
+
+Added payment_events collection with indexes:
+
+- unique_event_id
+- transaction_id_index
+- correlation_id_index
+- status_index
+- created_at_index
+
+### Application Integration
+
+FastAPI startup now initializes event indexes after MongoDB initialization.
+
+### Validation
+
+- Event schema test: PASS
+- Event service import: PASS
+- Docker MongoDB event insertion: PASS
+- Docker MongoDB event retrieval: PASS
+- Event indexes: PASS
+- FastAPI startup: PASS
+- No MongoDB index conflict in Docker: PASS
+- Test event removed: PASS
+
+### Important Architecture Note
+
+The event layer is currently a persistence/publishing foundation.
+
+Existing payment workflows have NOT yet been converted to event-driven processing.
+
+### Next Phase
+
+Phase 2B - Event Publishing Integration
+
+Goal:
+
+Introduce event publishing into the existing payment lifecycle without replacing the current synchronous workflows.
+
+Development sequence:
+
+1. Publish PAYMENT_CREATED event
+2. Test existing payment flow remains working
+3. Publish gateway/bank/reconciliation events
+4. Verify event timeline
+5. Run full system test
+6. Run CI
+7. Commit checkpoint
