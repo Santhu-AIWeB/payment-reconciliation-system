@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from backend.app.database import get_db
@@ -58,6 +59,25 @@ def publish_event(event: PaymentEvent) -> dict:
 
     return event_document
 
+def claim_next_pending_event() -> dict | None:
+    """
+    Atomically claim the oldest pending event.
+
+    Returns the claimed event document, or None when no pending
+    event is available.
+    """
+    events_collection = get_events_collection()
+
+    return events_collection.find_one_and_update(
+        {"status": "PENDING"},
+        {
+            "$set": {
+                "status": "PROCESSING",
+            }
+        },
+        sort=[("created_at", 1)],
+        return_document=ReturnDocument.AFTER,
+    )
 
 def mark_event_processing(event_id: str) -> bool:
     events_collection = get_events_collection()

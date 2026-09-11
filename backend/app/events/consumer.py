@@ -1,11 +1,8 @@
-from datetime import datetime, timezone
-
-from backend.app.events.schemas import EventStatus, EventType, PaymentEvent
+from backend.app.events.schemas import EventType, PaymentEvent
 from backend.app.events.service import (
-    get_events_collection,
+    claim_next_pending_event,
     mark_event_completed,
     mark_event_failed,
-    mark_event_processing,
 )
 
 
@@ -21,13 +18,13 @@ SUPPORTED_EVENT_TYPES = {
 
 
 def get_next_pending_event():
-    """Return the oldest pending event, or None when the queue is empty."""
-    events_collection = get_events_collection()
+    """
+    Atomically claim and return the oldest pending event.
 
-    event_document = events_collection.find_one(
-        {"status": EventStatus.PENDING.value},
-        sort=[("created_at", 1)],
-    )
+    The event is moved from PENDING to PROCESSING as part
+    of the same MongoDB operation.
+    """
+    event_document = claim_next_pending_event()
 
     if not event_document:
         return None
@@ -41,7 +38,8 @@ def handle_event(event: PaymentEvent) -> None:
     """
     Handle one event without duplicating existing business workflows.
 
-    Phase 2C initially provides event lifecycle processing only.
+    Phase 2D initially provides atomic event claiming and
+    event lifecycle processing only.
     Downstream business handlers will be introduced separately.
     """
     if event.event_type not in SUPPORTED_EVENT_TYPES:
@@ -49,7 +47,7 @@ def handle_event(event: PaymentEvent) -> None:
             f"Unsupported event type: {event.event_type.value}"
         )
 
-    # Phase 2C foundation:
+    # Phase 2D foundation:
     # Validate that the event is structurally correct and supported.
     print(
         f"[EVENT] Processed {event.event_type.value} "
@@ -61,6 +59,8 @@ def process_next_event() -> bool:
     """
     Process one pending event.
 
+    The event is atomically claimed before processing.
+
     Returns:
         True when an event was processed.
         False when no pending event exists.
@@ -68,9 +68,6 @@ def process_next_event() -> bool:
     event = get_next_pending_event()
 
     if event is None:
-        return False
-
-    if not mark_event_processing(event.event_id):
         return False
 
     try:
