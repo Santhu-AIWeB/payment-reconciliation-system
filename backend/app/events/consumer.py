@@ -1,8 +1,10 @@
 from backend.app.events.schemas import EventType, PaymentEvent
+
 from backend.app.events.service import (
     claim_next_pending_event,
     mark_event_completed,
     mark_event_failed,
+    retry_failed_event,
 )
 
 
@@ -81,6 +83,23 @@ def process_next_event() -> bool:
             str(exc),
         )
         return True
+
+
+def retry_event(
+    event_id: str,
+    max_retries: int = 3,
+) -> bool:
+    """
+    Re-queue a failed event when the retry limit allows it.
+
+    Returns:
+        True when the failed event was moved back to PENDING.
+        False otherwise.
+    """
+    return retry_failed_event(
+        event_id=event_id,
+        max_retries=max_retries,
+    )
 
 
 def process_pending_events(max_events: int = 10) -> int:

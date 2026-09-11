@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException, status
 
-from backend.app.events.consumer import process_next_event, process_pending_events
+from backend.app.events.consumer import (
+    process_next_event,
+    process_pending_events,
+    retry_event,
+)
 
 router = APIRouter(
     prefix="/api/events",
@@ -65,4 +69,52 @@ def process_pending(max_events: int = 10):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Event batch processing failed: {str(exc)}",
+        )
+
+
+@router.post("/{event_id}/retry")
+def retry_failed_event(
+    event_id: str,
+    max_retries: int = 3,
+):
+    """
+    Re-queue a failed event when the retry limit allows it.
+    """
+
+    if max_retries < 1 or max_retries > 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="max_retries must be between 1 and 10.",
+        )
+
+    try:
+        retried = retry_event(
+            event_id=event_id,
+            max_retries=max_retries,
+        )
+
+        if not retried:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Event cannot be retried. It may not exist, "
+                    "may not be FAILED, or may have reached the retry limit."
+                ),
+            )
+
+        return {
+            "success": True,
+            "retried": True,
+            "event_id": event_id,
+            "max_retries": max_retries,
+            "message": "Failed event re-queued successfully.",
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Event retry failed: {str(exc)}",
         )
