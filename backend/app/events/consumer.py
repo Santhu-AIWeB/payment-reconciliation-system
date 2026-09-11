@@ -1,11 +1,5 @@
+from backend.app.events.mongo_queue import MongoEventQueue
 from backend.app.events.schemas import EventType, PaymentEvent
-
-from backend.app.events.service import (
-    claim_next_pending_event,
-    mark_event_completed,
-    mark_event_failed,
-    retry_failed_event,
-)
 
 
 SUPPORTED_EVENT_TYPES = {
@@ -19,38 +13,28 @@ SUPPORTED_EVENT_TYPES = {
 }
 
 
-def get_next_pending_event():
+event_queue = MongoEventQueue()
+
+
+def get_next_pending_event() -> PaymentEvent | None:
     """
-    Atomically claim and return the oldest pending event.
-
-    The event is moved from PENDING to PROCESSING as part
-    of the same MongoDB operation.
+    Claim and return the next eligible event through the queue abstraction.
     """
-    event_document = claim_next_pending_event()
-
-    if not event_document:
-        return None
-
-    event_document.pop("_id", None)
-
-    return PaymentEvent.model_validate(event_document)
+    return event_queue.claim()
 
 
 def handle_event(event: PaymentEvent) -> None:
     """
     Handle one event without duplicating existing business workflows.
 
-    Phase 2D initially provides atomic event claiming and
-    event lifecycle processing only.
-    Downstream business handlers will be introduced separately.
+    Phase 2F keeps the existing event-processing behavior while
+    routing queue operations through the EventQueue abstraction.
     """
     if event.event_type not in SUPPORTED_EVENT_TYPES:
         raise ValueError(
             f"Unsupported event type: {event.event_type.value}"
         )
 
-    # Phase 2D foundation:
-    # Validate that the event is structurally correct and supported.
     print(
         f"[EVENT] Processed {event.event_type.value} "
         f"for transaction {event.transaction_id}"
@@ -61,11 +45,7 @@ def process_next_event() -> bool:
     """
     Process one pending event.
 
-    The event is atomically claimed before processing.
-
-    Returns:
-        True when an event was processed.
-        False when no pending event exists.
+    The queue implementation atomically claims the event before processing.
     """
     event = get_next_pending_event()
 
@@ -74,11 +54,11 @@ def process_next_event() -> bool:
 
     try:
         handle_event(event)
-        mark_event_completed(event.event_id)
+        event_queue.complete(event.event_id)
         return True
 
     except Exception as exc:
-        mark_event_failed(
+        event_queue.fail(
             event.event_id,
             str(exc),
         )
@@ -90,13 +70,9 @@ def retry_event(
     max_retries: int = 3,
 ) -> bool:
     """
-    Re-queue a failed event when the retry limit allows it.
-
-    Returns:
-        True when the failed event was moved back to PENDING.
-        False otherwise.
+    Re-queue a failed event through the queue abstraction.
     """
-    return retry_failed_event(
+    return event_queue.retry(
         event_id=event_id,
         max_retries=max_retries,
     )
