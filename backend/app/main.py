@@ -8,6 +8,7 @@ from backend.app.events.service import init_event_indexes
 from backend.app.routers import (
     audit,
     transactions,
+    events,
     payment_links,
     gateway,
     bank,
@@ -67,6 +68,7 @@ app.include_router(bank.router)
 app.include_router(reconciliation.router)
 app.include_router(refund.router)
 app.include_router(retry.router)
+app.include_router(events.router)
 app.include_router(dashboard.router)
 app.include_router(payment_links.router)
 app.include_router(audit.router)
