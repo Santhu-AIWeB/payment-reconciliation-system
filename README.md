@@ -1,80 +1,80 @@
-# Payment Failure & Reconciliation System
+**# Payment Failure & Reconciliation System**
 
-A full-stack, event-driven payment reconciliation simulation that detects inconsistencies between payment gateway results and bank transaction records, then routes each transaction into an appropriate resolution workflow such as **refund, retry, investigation, or wait**.
+A full-stack, event-driven payment reconciliation simulation that detects inconsistencies between payment gateway results and bank transaction records, then routes each transaction into an appropriate resolution workflow such as **\*\*refund, retry, investigation, or wait\*\***.
 
 The project also includes merchant payment links, a customer payment page, audit trail, transaction timeline, admin dashboard, AI-based anomaly detection, and Dockerized deployment.
 
-> **Important:** This is a simulation project. It does not connect to real banks, payment gateways, cards, UPI, or move real money.
+\> **\*\*Important:\*\*** This is a simulation project. It does not connect to real banks, payment gateways, cards, UPI, or move real money.
 
-## 🎯 Problem Statement
+**## 🎯 Problem Statement**
 
 Payment systems can encounter situations where the payment gateway and bank records disagree.
 
 For example:
 
-- Gateway says `FAILED`
+\- Gateway says \`FAILED\`
 
-- Bank says `DEBITED`
+\- Bank says \`DEBITED\`
 
 The customer may have been charged even though the payment appears failed at the gateway.
 
 A reconciliation system needs to:
 
-1. Collect gateway and bank outcomes.
+1\. Collect gateway and bank outcomes.
 
-2. Compare them.
+2\. Compare them.
 
-3. Detect mismatches and pending states.
+3\. Detect mismatches and pending states.
 
-4. Decide what action is required.
+4\. Decide what action is required.
 
-5. Execute the appropriate simulated resolution.
+5\. Execute the appropriate simulated resolution.
 
-6. Keep an audit trail.
+6\. Keep an audit trail.
 
-7. Highlight unusual transactions for investigation.
+7\. Highlight unusual transactions for investigation.
 
-## 🚀 Key Features
+**## 🚀 Key Features**
 
-### Payment Processing Simulation
+**### Payment Processing Simulation**
 
-- Transaction creation
+\- Transaction creation
 
-- Payment gateway simulator
+\- Payment gateway simulator
 
-- Bank transaction simulator
+\- Bank transaction simulator
 
-- Gateway outcomes: `SUCCESS`, `FAILED`, `TIMEOUT`
+\- Gateway outcomes: \`SUCCESS\`, \`FAILED\`, \`TIMEOUT\`
 
-- Bank outcomes: `DEBITED`, `NOT_DEBITED`, `DELAYED`
+\- Bank outcomes: \`DEBITED\`, \`NOT\_DEBITED\`, \`DELAYED\`
 
-### Reconciliation Engine
+**### Reconciliation Engine**
 
-| Gateway | Bank | Result | Action |
+\| Gateway | Bank | Result | Action |
 
-|---|---|---|---|
+\|---|---|---|---|
 
-| `FAILED` | `DEBITED` | `MISMATCH` | `REFUND` |
+\| \`FAILED\` | \`DEBITED\` | \`MISMATCH\` | \`REFUND\` |
 
-| `SUCCESS` | `NOT_DEBITED` | `MISMATCH` | `RETRY` |
+\| \`SUCCESS\` | \`NOT\_DEBITED\` | \`MISMATCH\` | \`RETRY\` |
 
-| `TIMEOUT` | `DEBITED` | `MISMATCH` | `INVESTIGATE` |
+\| \`TIMEOUT\` | \`DEBITED\` | \`MISMATCH\` | \`INVESTIGATE\` |
 
-| `TIMEOUT` | `NOT_DEBITED` | `PENDING` | `RETRY` |
+\| \`TIMEOUT\` | \`NOT\_DEBITED\` | \`PENDING\` | \`RETRY\` |
 
-| `SUCCESS` | `DELAYED` | `PENDING` | `WAIT` |
+\| \`SUCCESS\` | \`DELAYED\` | \`PENDING\` | \`WAIT\` |
 
-### 💰 Refund Workflow
+**### 💰 Refund Workflow**
 
-`FAILED + DEBITED → MISMATCH → REFUND`
+\`FAILED + DEBITED → MISMATCH → REFUND\`
 
 The system provides a simulated refund workflow and records the result for the transaction.
 
-### 🔄 Retry Workflow
+**### 🔄 Retry Workflow**
 
-Retry-eligible transactions can be processed through simulated retry attempts. The maximum is **3 attempts**.
+Retry-eligible transactions can be processed through simulated retry attempts. The maximum is **\*\*3 attempts\*\***.
 
-```text
+\`\`\`text
 
 Transaction
 
@@ -88,7 +88,7 @@ Reconciliation
 
      ↓
 
-action_required = RETRY
+action\_required = RETRY
 
      ↓
 
@@ -96,47 +96,47 @@ Attempt 1 → Attempt 2 → Attempt 3
 
      ↓
 
-MAX_ATTEMPTS_REACHED
+MAX\_ATTEMPTS\_REACHED
 
-```
+\`\`\`
 
-### 🔎 Investigation Workflow
+**### 🔎 Investigation Workflow**
 
-For cases such as `TIMEOUT + DEBITED`, reconciliation routes the transaction to `INVESTIGATE`. The admin interface provides transaction details and AI investigation information.
+For cases such as \`TIMEOUT + DEBITED\`, reconciliation routes the transaction to \`INVESTIGATE\`. The admin interface provides transaction details and AI investigation information.
 
-### 🤖 AI Anomaly Detection
+**### 🤖 AI Anomaly Detection**
 
-The project uses **Scikit-learn Isolation Forest** when sufficient historical data is available, with a rule-based fallback otherwise.
+The project uses **\*\*Scikit-learn Isolation Forest\*\*** when sufficient historical data is available, with a rule-based fallback otherwise.
 
 Features include:
 
-- Payment amount
+\- Payment amount
 
-- Gateway failure
+\- Gateway failure
 
-- Gateway timeout
+\- Gateway timeout
 
-- Bank debited
+\- Bank debited
 
-- Bank delayed
+\- Bank delayed
 
-- Reconciliation mismatch
+\- Reconciliation mismatch
 
-- Reconciliation pending
+\- Reconciliation pending
 
-- Refund action
+\- Refund action
 
-- Retry action
+\- Retry action
 
-- Investigation action
+\- Investigation action
 
 The AI endpoint provides an anomaly result, risk/anomaly score, risk level, model type, training sample count, explanation, and recommended investigation priority.
 
-> The AI score is an anomaly/risk score, not a probability that a payment will fail.
+\> The AI score is an anomaly/risk score, not a probability that a payment will fail.
 
-### 🔗 Merchant Payment Links
+**### 🔗 Merchant Payment Links**
 
-```text
+\`\`\`text
 
 Merchant
 
@@ -164,45 +164,45 @@ Reconciliation
 
 Customer Result
 
-```
+\`\`\`
 
-### 👤 Customer Experience
+**### 👤 Customer Experience**
 
-- Payment-link based flow
+\- Payment-link based flow
 
-- Customer payment page
+\- Customer payment page
 
-- Payment result page
+\- Payment result page
 
-- Exception handling
+\- Exception handling
 
-- Transaction status information
+\- Transaction status information
 
-### 📊 Admin Dashboard
+**### 📊 Admin Dashboard**
 
-- Transaction statistics
+\- Transaction statistics
 
-- Matched, mismatched, and pending payments
+\- Matched, mismatched, and pending payments
 
-- Refunds
+\- Refunds
 
-- Retry attempts
+\- Retry attempts
 
-- Investigations
+\- Investigations
 
-\- Transaction details
+\\- Transaction details
 
-- Audit trail
+\- Audit trail
 
-- Transaction timeline
+\- Transaction timeline
 
-- AI investigation drawer
+\- AI investigation drawer
 
-### 🧾 Audit Trail
+**### 🧾 Audit Trail**
 
 A transaction lifecycle can be inspected as:
 
-```text
+\`\`\`text
 
 CREATED
 
@@ -226,12 +226,13 @@ MATCHED / MISMATCH / PENDING
 
 REFUND / RETRY / INVESTIGATE / WAIT
 
-```
+\`\`\`
 
-## 🏗️ Architecture
+**## 🏗️ Architecture**
 
 The system uses separate customer, gateway, bank, backend, worker, and admin components. RabbitMQ is used for asynchronous event delivery, while MongoDB keeps the permanent transaction and event history.
 
+```text
 
  Customer Payment Frontend                 Admin Dashboard
         :5174                                     :5173
@@ -282,20 +283,24 @@ The system uses separate customer, gateway, bank, backend, worker, and admin com
                     │   MongoDB    │
                     │    :27017    │
                     └──────────────┘
+```
 
-Event-Driven Processing
+### Event-Driven Processing
 
 The payment lifecycle publishes events such as:
 
+```text
 PAYMENT_CREATED
 GATEWAY_PROCESSED
 BANK_PROCESSED
 RECONCILIATION_REQUIRED
+```
 
 These events are persisted in MongoDB as the permanent event history and delivered through RabbitMQ to the background worker. The worker consumes reconciliation events and triggers the appropriate simulated business workflow.
 
 For example:
 
+```text
 FAILED + DEBITED
       ↓
 MISMATCH / REFUND
@@ -307,35 +312,37 @@ RabbitMQ
 Worker
       ↓
 Refund workflow
+```
 
 RabbitMQ is responsible for message delivery; the worker performs the business operation; MongoDB stores the durable transaction and event records.
 
-## 🛠️ Tech Stack
+**## 🛠️ Tech Stack**
 
-| Layer | Technology |
+\| Layer | Technology |
 
-|---|---|
+\|---|---|
 
-| Frontend | React + Vite |
+\| Frontend | React + Vite |
 
-| Backend | Python + FastAPI |
+\| Backend | Python + FastAPI |
 
-| Database | MongoDB + PyMongo |
+\| Database | MongoDB + PyMongo |
 
-| Validation | Pydantic |
+\| Validation | Pydantic |
 
-| AI/ML | Scikit-learn + NumPy |
+\| AI/ML | Scikit-learn + NumPy |
 
-| API Testing | Postman + Python automated test |
+\| API Testing | Postman + Python automated test |
 
-| API Documentation | FastAPI Swagger/OpenAPI |
+\| API Documentation | FastAPI Swagger/OpenAPI |
 
-| Containerization | Docker |
+\| Containerization | Docker |
 
-| Orchestration | Docker Compose |
+\| Orchestration | Docker Compose |
 
-## 📁 Project Structure
+**## 📁 Project Structure**
 
+```text
 payment-reconciliation-system/
 │
 ├── backend/                     ← Main reconciliation API
@@ -389,11 +396,13 @@ payment-reconciliation-system/
 ├── .env.example
 ├── .gitignore
 └── README.md
+```
 
-## 🔌 API Endpoints
+**## 🔌 API Endpoints**
 
 Main backend endpoints:
 
+```text
 POST /api/transactions
 POST /api/gateway/process
 POST /api/bank/process
@@ -404,27 +413,32 @@ GET  /api/events
 GET  /api/dashboard/summary
 GET  /api/dashboard/transactions
 GET  /api/ai/analyze/{transaction_id}
+```
 
 Gateway Server endpoints include the customer payment flow and gateway transaction status.
 
+```text
 POST /api/gateway/pay
 POST /api/gateway/test-pay
 GET  /api/gateway/transaction/{transaction_id}
+```
 
-## 🐳 Run with Docker
+**## 🐳 Run with Docker**
 
-### Prerequisites
+**### Prerequisites**
 
-Docker Desktop
+- Docker Desktop
+- Git
 
-Git
+**### Start**
 
-### Start
-
+```bash
 docker compose up -d --build
+```
 
 Services:
 
+```text
 Admin Dashboard       → http://localhost:5173
 Customer Payment      → http://localhost:5174
 Backend API           → http://localhost:8000
@@ -435,46 +449,51 @@ RabbitMQ              → localhost:5672
 RabbitMQ Management   → http://localhost:15672
 MongoDB               → localhost:27017
 Payment Worker        → background container
+```
 
 Check containers:
 
+```bash
 docker compose ps
+```
 
 Stop:
 
+```bash
 docker compose down
-
-Do not use docker compose down -v unless you intentionally want to remove the MongoDB Docker volume and its stored simulated data.
-
-## ⚙️ Environment Variables
-
-Create `.env` from `.env.example`:
-
-```env
-
-MONGODB_URI=mongodb://localhost:27017
-
-DB_NAME=payment_reconciliation_db
-
 ```
 
-`.env` is intentionally ignored by Git.
+> Do not use `docker compose down -v` unless you intentionally want to remove the MongoDB Docker volume and its stored simulated data.
+
+**## ⚙️ Environment Variables**
+
+Create \`.env\` from \`.env.example\`:
+
+\`\`\`env
+
+MONGODB\_URI=mongodb://localhost:27017
+
+DB\_NAME=payment\_reconciliation\_db
+
+\`\`\`
+
+\`.env\` is intentionally ignored by Git.
 
 Never commit real credentials, API keys, bank credentials, payment gateway secrets, card information, or other sensitive data.
 
-## 🧪 Automated Full-System Testing
+**## 🧪 Automated Full-System Testing**
 
 The repository includes:
 
-```text
+\`\`\`text
 
-full_system_test.py
+full\_system\_test.py
 
-```
+\`\`\`
 
 It verifies five complete scenarios:
 
-```text
+\`\`\`text
 
 FAILED + DEBITED
 
@@ -484,7 +503,7 @@ FAILED + DEBITED
 
 → COMPLETED
 
-SUCCESS + NOT_DEBITED
+SUCCESS + NOT\_DEBITED
 
 → MISMATCH
 
@@ -498,7 +517,7 @@ TIMEOUT + DEBITED
 
 → INVESTIGATE
 
-TIMEOUT + NOT_DEBITED
+TIMEOUT + NOT\_DEBITED
 
 → PENDING
 
@@ -512,150 +531,150 @@ SUCCESS + DELAYED
 
 → WAIT
 
-```
+\`\`\`
 
 Run:
 
-```bash
+\`\`\`bash
 
-python full_system_test.py
+python full\_system\_test.py
 
-```
+\`\`\`
 
 The suite also checks the AI endpoint, Isolation Forest availability, refund/retry workflows, dashboard transaction details, lifecycle events, and RabbitMQ publication state.
 
-## 📈 Validation Result
+**## 📈 Validation Result**
 
 The complete system test was successfully executed across all five scenarios.
 
 Validated components include:
 
-- Transaction creation
+\- Transaction creation
 
-- Gateway simulation
+\- Gateway simulation
 
-- Bank simulation
+\- Bank simulation
 
-- Reconciliation
+\- Reconciliation
 
-- Refund workflow
+\- Refund workflow
 
-- Retry workflow
+\- Retry workflow
 
-- Investigation routing
+\- Investigation routing
 
-- Pending handling
+\- Pending handling
 
-- AI anomaly endpoint
+\- AI anomaly endpoint
 
-- Isolation Forest model
+\- Isolation Forest model
 
-- Dashboard transaction details
+\- Dashboard transaction details
 
-- Refund visibility
+\- Refund visibility
 
-- Retry visibility
+\- Retry visibility
 
-```text
+\`\`\`text
 
 RESULT: ALL TESTS PASSED
 
-```
+\`\`\`
 
-## 🔐 Security & Scope
+**## 🔐 Security & Scope**
 
-This is a **simulation** for learning, portfolio demonstration, and system-design practice.
+This is a **\*\*simulation\*\*** for learning, portfolio demonstration, and system-design practice.
 
-It does **not**:
+It does **\*\*not\*\***:
 
-- Move real money
+\- Move real money
 
-- Connect to real banks
+\- Connect to real banks
 
-- Connect to real payment gateways
+\- Connect to real payment gateways
 
-- Process real card numbers
+\- Process real card numbers
 
-- Process real UPI credentials
+\- Process real UPI credentials
 
-- Store real financial credentials
+\- Store real financial credentials
 
-- Initiate real refunds
+\- Initiate real refunds
 
-- Initiate real bank transfers
+\- Initiate real bank transfers
 
 All gateway, bank, refund, and retry operations are simulated inside the application.
 
-## 🎓 Learning Outcomes
+**## 🎓 Learning Outcomes**
 
 This project demonstrates practical experience with:
 
-- Full-stack application development
+\- Full-stack application development
 
-- REST API design
+\- REST API design
 
-- FastAPI
+\- FastAPI
 
-- React
+\- React
 
-- MongoDB
+\- MongoDB
 
-- Payment reconciliation concepts
+\- Payment reconciliation concepts
 
-- Transaction state management
+\- Transaction state management
 
-- Failure handling
+\- Failure handling
 
-- Retry strategies
+\- Retry strategies
 
-- Refund workflows
+\- Refund workflows
 
-- Audit logging
+\- Audit logging
 
-- Docker and Docker Compose
+\- Docker and Docker Compose
 
-- API testing
+\- API testing
 
-- Machine-learning anomaly detection
+\- Machine-learning anomaly detection
 
-- Integrating AI into an operational dashboard
+\- Integrating AI into an operational dashboard
 
-## 🔮 Future Improvements
+**## 🔮 Future Improvements**
 
 Potential production-oriented extensions:
 
-- Real payment-provider adapters
+\- Real payment-provider adapters
 
-\- Scheduled reconciliation jobs
+\\- Scheduled reconciliation jobs
 
-- Idempotency keys across payment operations
+\- Idempotency keys across payment operations
 
-- Distributed locking
+\- Distributed locking
 
-- Role-based access control
+\- Role-based access control
 
-- Authentication and authorization
+\- Authentication and authorization
 
-- Observability and metrics
+\- Observability and metrics
 
-- Alerting
+\- Alerting
 
-- Model monitoring and retraining pipelines
+\- Model monitoring and retraining pipelines
 
-- Cloud deployment
+\- Cloud deployment
 
-- Automated CI/CD
+\- Automated CI/CD
 
-- Automated security scanning
+\- Automated security scanning
 
 RabbitMQ-based asynchronous event delivery and background reconciliation processing are already implemented in the current simulation. The remaining items are future production-oriented extensions.
 
-## 👨‍💻 Author
+**## 👨‍💻 Author**
 
-**V. Santosh**
+**\*\*V. Santosh\*\***
 
 B.Tech — Computer Science & Engineering (AI/ML)
 
-## 📄 License
+**## 📄 License**
 
 This project is intended for educational and portfolio purposes.
