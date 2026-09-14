@@ -8,8 +8,7 @@ import StatusBadge from './components/StatusBadge'
 import TransactionsTable from './components/TransactionsTable'
 import TransactionDetail from './components/TransactionDetail'
 import { fetchSummary, fetchTransactions } from './api/dashboard'
-import PaymentPage from './pages/PaymentPage'
-import PaymentLinksPage from './pages/PaymentLinksPage'
+import EventOperationsPage from './pages/EventOperationsPage'
 
 function fmtAmount(amount, currency = 'INR') {
   if (amount == null) return '—'
@@ -1385,10 +1384,28 @@ function OverviewPage({
   )
 }
 
-export default function App() {
-  const isPaymentPage = window.location.pathname.startsWith('/pay/')
+const ROUTE_TO_PAGE = {
+  '/': 'overview',
+  '/transactions': 'transactions',
+  '/reconciliation': 'reconciliation',
+  '/refunds': 'refunds',
+  '/retries': 'retries',
+  '/investigations': 'investigations',
+  '/event-operations': 'event_operations',
+}
 
-  const [page, setPage] = useState('overview')
+const PAGE_TO_ROUTE = Object.fromEntries(
+  Object.entries(ROUTE_TO_PAGE).map(([route, page]) => [page, route])
+)
+
+function getPageFromPathname(pathname) {
+  return ROUTE_TO_PAGE[pathname] || 'overview'
+}
+
+export default function App() {
+  const [page, setPage] = useState(() =>
+    getPageFromPathname(window.location.pathname)
+  )
   const [summary, setSummary] = useState(null)
   const [transactions, setTransactions] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -1400,9 +1417,33 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] =
     useState(false)
 
-  const loadData = useCallback(async () => {
-    if (isPaymentPage) return
+  const navigateToPage = useCallback(nextPage => {
+    const route = PAGE_TO_ROUTE[nextPage] || '/'
 
+    if (window.location.pathname !== route) {
+      window.history.pushState({}, '', route)
+    }
+
+    setPage(nextPage)
+  }, [])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextPage = getPageFromPathname(window.location.pathname)
+
+      if (nextPage) {
+        setPage(nextPage)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
+  const loadData = useCallback(async () => {
     setSpinning(true)
     setLoading(true)
     setError(null)
@@ -1429,15 +1470,11 @@ export default function App() {
         setSpinning(false)
       }, 500)
     }
-  }, [isPaymentPage])
+  }, [])
 
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  if (isPaymentPage) {
-    return <PaymentPage />
-  }
 
   const pageMeta = {
     overview: [
@@ -1448,11 +1485,6 @@ export default function App() {
     transactions: [
       'Transactions',
       'Search and inspect payment lifecycles',
-    ],
-
-    payment_links: [
-      'Payment Links',
-      'Create and manage customer payment links',
     ],
 
     reconciliation: [
@@ -1474,6 +1506,11 @@ export default function App() {
       'Investigations',
       'Review transactions that need manual attention',
     ],
+
+    event_operations: [
+      'Event Operations',
+      'Monitor payment events and RabbitMQ delivery',
+    ],
   }
 
   const [title, subtitle] =
@@ -1489,7 +1526,7 @@ export default function App() {
     >
       <Sidebar
         activePage={page}
-        onNavigate={setPage}
+        onNavigate={navigateToPage}
         collapsed={sidebarCollapsed}
         onToggle={() =>
           setSidebarCollapsed(
@@ -1536,7 +1573,7 @@ export default function App() {
                 <OverviewPage
                   summary={summary}
                   transactions={transactions}
-                  onNavigate={setPage}
+                  onNavigate={navigateToPage}
                   onSelect={setSelectedTxn}
                 />
               )}
@@ -1546,10 +1583,6 @@ export default function App() {
                   transactions={transactions}
                   onSelect={setSelectedTxn}
                 />
-              )}
-
-              {page === 'payment_links' && (
-                <PaymentLinksPage />
               )}
 
               {page === 'reconciliation' && (
@@ -1578,6 +1611,10 @@ export default function App() {
                   transactions={transactions}
                   onSelect={setSelectedTxn}
                 />
+              )}
+
+              {page === 'event_operations' && (
+                <EventOperationsPage />
               )}
             </>
           )}

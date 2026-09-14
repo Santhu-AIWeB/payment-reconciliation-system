@@ -8,17 +8,21 @@ Production-Style Architecture Upgrade
 
 The core payment reconciliation simulation is working and fully tested.
 
+The project now includes separate customer payment, gateway, bank, backend, RabbitMQ, worker, reconciliation, AI, and admin components.
+
 ## Completed
 
 - FastAPI backend
 - MongoDB persistence
 - Gateway simulator
+- Separate Gateway Server
 - Bank simulator
+- Separate Bank Server
 - Reconciliation engine
 - Refund workflow
 - Retry workflow
 - Payment link generator
-- Customer payment page
+- Separate customer payment page
 - Customer result/exception handling
 - Admin dashboard
 - Transaction lifecycle
@@ -26,6 +30,7 @@ The core payment reconciliation simulation is working and fully tested.
 - Refunds UI
 - Retries UI
 - Investigations UI
+- Event Operations UI
 - AI anomaly detection
 - Docker Compose setup
 - Full system testing
@@ -38,53 +43,154 @@ The core payment reconciliation simulation is working and fully tested.
 - Atomic event claiming
 - Event retry and recovery
 - Exponential retry backoff
+- RabbitMQ integration
+- RabbitMQ worker
+- Event-driven reconciliation workflow
+- Automatic refund workflow through worker
+- Automatic retry workflow through worker
+- Dead-letter queue support
+- Transaction cleanup/delete endpoint
 
 ## Current Architecture
 
-React Frontend
+Customer Payment Frontend
     ↓
-FastAPI API
+Gateway Server
     ↓
-Routers
+Dummy Bank Server
     ↓
-MongoDB
-
-Event publishing and an explicit event consumer API are now available alongside the existing synchronous workflows.
-
-Some workflows currently execute synchronously inside API requests.
-
-## Production-Style Target Architecture
-
-React Frontend
+Main Backend API
     ↓
-FastAPI API Layer
+Reconciliation Engine
     ↓
-Event / Message Layer
+RabbitMQ
     ↓
-Workers
-    ├── Payment Worker
-    ├── Gateway Worker
-    ├── Bank Worker
-    ├── Reconciliation Worker
-    ├── Refund Worker
-    └── Retry Worker
+Worker
+    ├── Refund workflow
+    ├── Retry workflow
+    ├── Investigation routing
+    └── Wait / Pending handling
     ↓
 MongoDB
+    ↓
+Admin Dashboard
 
-Additional production-style components will later include:
+Supporting services:
 
-- Event-driven processing
-- Message queue
-- Retry with exponential backoff
-- Dead-letter queue
-- Webhook handling
-- Correlation IDs
-- Structured logging
-- Metrics
-- Failure injection
-- Load/integration testing
-- RBAC
-- Improved AI anomaly detection
+- MongoDB
+- RabbitMQ
+- RabbitMQ Management UI
+
+The customer payment frontend is separate from the Admin Dashboard.
+
+The Gateway Server and Dummy Bank Server are separate services.
+
+RabbitMQ is used for asynchronous event/message delivery.
+
+The Worker consumes reconciliation events and triggers the appropriate workflow.
+
+## Event-Driven Architecture
+
+Payment lifecycle events are persisted in MongoDB and published to RabbitMQ.
+
+### Lifecycle Events
+
+- PAYMENT_CREATED
+- GATEWAY_PROCESSED
+- BANK_PROCESSED
+- RECONCILIATION_REQUIRED
+
+### Reconciliation Actions
+
+- NONE
+- REFUND
+- RETRY
+- INVESTIGATE
+- WAIT
+
+Current flow:
+
+Reconciliation Engine
+    ↓
+Creates reconciliation event
+    ↓
+RabbitMQ
+    ↓
+Worker
+    ↓
+Action handling
+
+The Reconciliation Engine decides the required action.
+
+RabbitMQ delivers the event.
+
+The Worker triggers the applicable automatic workflow.
+
+Investigation remains a manual-review case in the current implementation.
+
+## Event Storage
+
+Payment events are permanently stored in MongoDB in:
+
+payment_events
+
+RabbitMQ is used for message delivery and processing.
+
+MongoDB
+    ↓
+Permanent event history / audit record
+
+RabbitMQ
+    ↓
+Asynchronous message delivery
+
+Processed RabbitMQ messages may leave the queue while their MongoDB event history remains available.
+
+## RabbitMQ
+
+The current message queue uses RabbitMQ.
+
+Main topology:
+
+Exchange:
+
+payment_events
+
+Queue:
+
+payment_event_queue
+
+Routing key:
+
+payment.event
+
+Dead-letter exchange:
+
+payment_events_dlx
+
+Dead-letter queue:
+
+payment_event_dead_letter
+
+RabbitMQ is responsible for asynchronous event delivery.
+
+The Worker consumes messages from the queue and handles the applicable workflow.
+
+## Worker
+
+The Worker continuously consumes RabbitMQ events.
+
+Current behavior:
+
+RECONCILIATION_REQUIRED
+    ↓
+Read action_required
+    ↓
+REFUND / RETRY / INVESTIGATE / WAIT
+
+The Worker does not decide the reconciliation result.
+
+The Reconciliation Engine makes that decision first.
 
 ## Important Scope
 
@@ -103,61 +209,183 @@ It does NOT connect to:
 Transaction states include:
 
 CREATED
+
 PROCESSING
+
 SUCCESS
+
 FAILED
+
 TIMEOUT
+
 PENDING
+
 RESOLVED
+
 MANUAL_REVIEW
 
 Reconciliation states include:
 
 MATCHED
+
 MISMATCH
+
 PENDING
+
 DUPLICATE
 
 Actions include:
 
 NONE
+
 REFUND
+
 RETRY
+
 INVESTIGATE
+
 WAIT
+
 BLOCK
+
+## Automatic Resolution
+
+### Refund Flow
+
+FAILED + DEBITED
+↓
+MISMATCH
+↓
+REFUND
+↓
+RabbitMQ
+↓
+Worker
+↓
+Refund workflow
+↓
+Refund COMPLETED
+↓
+Transaction RESOLVED
+
+### Retry Flow
+
+SUCCESS + NOT_DEBITED
+↓
+MISMATCH
+↓
+RETRY
+↓
+RabbitMQ
+↓
+Worker
+↓
+Retry workflow
+↓
+Transaction resolved after successful retry
+
+### Investigation Flow
+
+TIMEOUT + DEBITED
+↓
+MISMATCH
+↓
+INVESTIGATE
+↓
+RabbitMQ
+↓
+Worker
+↓
+Manual review required
+
+No automatic financial action is performed for the investigation case.
+
+### Wait Flow
+
+SUCCESS + DELAYED
+↓
+PENDING
+↓
+WAIT
+
+The transaction remains pending until a final bank result becomes available.
 
 ## Current Production Upgrade Step
 
-Phase 2E - Event Retry & Recovery - COMPLETED
+Phase 2F - RabbitMQ Message Queue & Worker Integration - COMPLETED
 
-Next tasks:
+Completed on 2026-09-14.
 
-1. Maintain current event retry and recovery foundation
-2. Introduce a message queue abstraction
-3. Preserve existing synchronous payment workflows
-4. Test queue integration incrementally
-5. Run full system test
-6. Run CI
-7. Commit checkpoint
+### Added
+
+- RabbitMQ message queue integration
+- RabbitMQ exchange and queue setup
+- Dead-letter exchange and queue
+- RabbitMQ publisher integration
+- RabbitMQ worker
+- Worker-based event processing
+- Event delivery tracking
+- Automatic refund trigger
+- Automatic retry trigger
+- Investigation routing
+- Wait / pending handling
+- Full-system event-driven validation
+
+### Architecture Change
+
+The system moved from the earlier event persistence/consumer foundation to a real RabbitMQ-based message delivery workflow.
+
+Current flow:
+
+Payment lifecycle
+    ↓
+Event persisted in MongoDB
+    ↓
+Event published to RabbitMQ
+    ↓
+Worker consumes event
+    ↓
+Business workflow executes
+    ↓
+Database state updated
+
+### Validation
+
+- RabbitMQ container running: PASS
+- RabbitMQ exchange/queue setup: PASS
+- Event publishing: PASS
+- Worker startup: PASS
+- Worker event consumption: PASS
+- Automatic refund workflow: PASS
+- Automatic retry workflow: PASS
+- Investigation routing: PASS
+- Wait / pending handling: PASS
+- Event completion acknowledgement: PASS
+- Dead-letter handling: PASS
+- Full system regression: PASS
 
 ## Rules For Development
 
 Every architecture change must follow:
 
 Change
+
 ↓
 
 Local test
+
 ↓
 
 Full system test
+
 ↓
 
 GitHub Actions CI
+
 ↓
 
 Commit
+
 ↓
 
 Update PROJECT_PROGRESS.md
@@ -170,22 +398,28 @@ Working tree should remain clean after each completed checkpoint.
 
 ## Next Architecture Step
 
-Phase 2F - Message Queue Foundation
+Phase 2G - Production Readiness & Final Validation
 
 Goal:
 
-Introduce a real message-queue abstraction behind the current event layer without immediately migrating every business workflow.
+Improve the reliability, security, maintainability, documentation, and demonstration readiness of the current working architecture without changing the core payment flow unnecessarily.
 
-The next stage should evaluate a queue technology such as Redis, RabbitMQ, or Kafka and introduce it incrementally while preserving:
+Potential tasks:
 
-- Existing payment workflows
-- Event persistence
-- Atomic event claiming
-- Retry protection
-- Exponential backoff
-- Full system test coverage
-- Green GitHub Actions CI
-
+- Admin UI review
+- API validation review
+- Security review
+- Error handling review
+- Event reliability review
+- Database consistency review
+- Idempotency review
+- Logging improvements
+- Metrics and monitoring
+- Final Docker validation
+- Full regression test
+- GitHub Actions CI verification
+- README and architecture documentation
+- Final project demonstration preparation
 
 ## Phase 2A - Event Model Foundation - COMPLETED
 
@@ -254,9 +488,9 @@ FastAPI startup now initializes event indexes after MongoDB initialization.
 
 ### Important Architecture Note
 
-The event layer is currently a persistence/publishing foundation.
+The event layer initially started as a persistence and event foundation.
 
-Existing payment workflows have NOT yet been converted to event-driven processing.
+Existing payment workflows were not initially converted to event-driven processing.
 
 ### Next Phase
 
@@ -264,7 +498,7 @@ Phase 2B - Event Publishing Integration
 
 Goal:
 
-Introduce event publishing into the existing payment lifecycle without replacing the current synchronous workflows.
+Introduce event publishing into the existing payment lifecycle without replacing the existing business workflows.
 
 Development sequence:
 
@@ -275,7 +509,6 @@ Development sequence:
 5. Run full system test
 6. Run CI
 7. Commit checkpoint
-
 
 ## Phase 2B - Event Publishing Integration - COMPLETED
 
@@ -301,13 +534,12 @@ Completed on 2026-09-10.
 - Gateway event persisted: PASS
 - Bank event persisted: PASS
 - Reconciliation event persisted: PASS
-- Existing synchronous payment flow remained functional: PASS
+- Existing payment flow remained functional: PASS
 - Full system test: PASS
 
 ### Architecture Note
 
-Event publishing was introduced without replacing the existing synchronous business workflows.
-
+Event publishing was introduced without replacing the existing business workflows.
 
 ## Phase 2C - Event Consumer API - COMPLETED
 
@@ -343,10 +575,9 @@ Completed on 2026-09-10.
 
 ### Architecture Note
 
-The consumer is intentionally explicit/manual at this stage.
+The consumer API was initially introduced as an explicit/manual processing mechanism.
 
-No automatic background worker has been introduced yet.
-
+A later phase introduced the automatic RabbitMQ Worker.
 
 ## Phase 2D - Atomic Event Claiming - COMPLETED
 
@@ -359,9 +590,10 @@ Completed on 2026-09-11.
 
 ### Behavior
 
-Event claiming now uses a single MongoDB find_one_and_update() operation to transition:
+Event claiming uses a single MongoDB find_one_and_update() operation to transition:
 
 PENDING
+
 ↓
 
 PROCESSING
@@ -380,8 +612,7 @@ This prevents two concurrent consumers from claiming the same pending event.
 
 ### Architecture Note
 
-Atomic event claiming is now the foundation for future worker-based processing.
-
+Atomic event claiming became the foundation for later worker-based processing.
 
 ## Phase 2E - Event Retry & Recovery - COMPLETED
 
@@ -399,15 +630,19 @@ Completed on 2026-09-11.
 ### Retry Flow
 
 FAILED
+
 ↓
 
 Retry eligible?
+
 ↓
 
 PENDING
+
 ↓
 
 PROCESSING
+
 ↓
 
 COMPLETED / FAILED
@@ -421,6 +656,7 @@ Default maximum retries:
 Events with:
 
 retry_count < max_retries
+
 ↓
 
 can be re-queued
@@ -428,6 +664,7 @@ can be re-queued
 Events with:
 
 retry_count >= max_retries
+
 ↓
 
 remain FAILED
@@ -480,6 +717,167 @@ Pending events are eligible for processing when:
 
 ### Architecture Note
 
-Retry recovery is currently implemented at the event persistence and consumer layer.
+Retry recovery was initially implemented at the event persistence and consumer layer.
 
-A real distributed message queue has NOT yet been introduced.
+A real RabbitMQ message queue was introduced later in Phase 2F.
+
+## Transaction Cleanup
+
+A transaction cleanup endpoint is available:
+
+DELETE /api/transactions/{transaction_id}
+
+The endpoint removes records associated with the transaction from:
+
+- transactions
+- gateway_transactions
+- bank_transactions
+- reconciliations
+- refunds
+- retry_attempts
+- payment_links
+- payment_events
+
+The cleanup was tested successfully using a controlled transaction.
+
+## Full-System Validation
+
+The complete system test validates five important scenarios:
+
+### FAILED + DEBITED
+
+FAILED
+
+↓
+
+DEBITED
+
+↓
+
+MISMATCH
+
+↓
+
+REFUND
+
+↓
+
+Automatic refund
+
+↓
+
+RESOLVED
+
+### SUCCESS + NOT_DEBITED
+
+SUCCESS
+
+↓
+
+NOT_DEBITED
+
+↓
+
+MISMATCH
+
+↓
+
+RETRY
+
+↓
+
+Automatic retry
+
+↓
+
+RESOLVED
+
+### TIMEOUT + DEBITED
+
+TIMEOUT
+
+↓
+
+DEBITED
+
+↓
+
+MISMATCH
+
+↓
+
+INVESTIGATE
+
+↓
+
+Manual review
+
+### TIMEOUT + NOT_DEBITED
+
+TIMEOUT
+
+↓
+
+NOT_DEBITED
+
+↓
+
+PENDING
+
+↓
+
+RETRY
+
+↓
+
+Automatic retry
+
+↓
+
+RESOLVED
+
+### SUCCESS + DELAYED
+
+SUCCESS
+
+↓
+
+DELAYED
+
+↓
+
+PENDING
+
+↓
+
+WAIT
+
+↓
+
+Remains pending
+
+### Final Validation
+
+- Backend reachable: PASS
+- Gateway Server reachable: PASS
+- Bank Server reachable: PASS
+- RabbitMQ available: PASS
+- Worker available: PASS
+- Transaction processing: PASS
+- Gateway processing: PASS
+- Bank processing: PASS
+- Reconciliation: PASS
+- Automatic refund workflow: PASS
+- Automatic retry workflow: PASS
+- Investigation routing: PASS
+- Pending handling: PASS
+- Event lifecycle recording: PASS
+- RabbitMQ publication: PASS
+- Worker event processing: PASS
+- AI anomaly analysis: PASS
+- Dashboard transaction details: PASS
+- Refund visibility: PASS
+- Retry visibility: PASS
+- Full regression: PASS
+
+RESULT: ALL TESTS PASSED

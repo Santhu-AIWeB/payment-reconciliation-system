@@ -45,8 +45,30 @@ def init_event_indexes() -> None:
         name="next_retry_at_index",
     )
 
+    events_collection.create_index(
+        "broker_published_at",
+        name="broker_published_at_index",
+    )
 
-def publish_event(event: PaymentEvent) -> dict:
+
+def get_event(event_id: str) -> dict | None:
+    """
+    Return one event from MongoDB using its event_id.
+    """
+    events_collection = get_events_collection()
+
+    return events_collection.find_one(
+        {"event_id": event_id}
+    )
+
+
+def persist_event(event: PaymentEvent) -> dict:
+    """
+    Persist a PaymentEvent in MongoDB.
+
+    MongoDB is the durable event history. RabbitMQ publication
+    is handled separately by DualWriteEventPublisher.
+    """
     events_collection = get_events_collection()
 
     event_document = event.model_dump()
@@ -63,6 +85,59 @@ def publish_event(event: PaymentEvent) -> dict:
         )
 
     return event_document
+
+
+def publish_event(event: PaymentEvent) -> dict:
+    """
+    Backward-compatible event publishing function.
+
+    Existing code may still call publish_event().
+    Keep the function available while the dual-write publisher
+    is introduced.
+    """
+    return persist_event(event)
+
+
+def mark_event_broker_published(event_id: str) -> bool:
+    """
+    Mark an event as successfully published to RabbitMQ.
+    """
+    events_collection = get_events_collection()
+
+    result = events_collection.update_one(
+        {"event_id": event_id},
+        {
+            "$set": {
+                "broker_published_at": datetime.now(timezone.utc),
+                "broker_error": None,
+            }
+        },
+    )
+
+    return result.modified_count == 1
+
+
+def mark_event_broker_error(
+    event_id: str,
+    error_message: str,
+) -> bool:
+    """
+    Record a RabbitMQ publication failure.
+
+    The event remains in MongoDB so it can be recovered later.
+    """
+    events_collection = get_events_collection()
+
+    result = events_collection.update_one(
+        {"event_id": event_id},
+        {
+            "$set": {
+                "broker_error": error_message,
+            }
+        },
+    )
+
+    return result.modified_count == 1
 
 
 def claim_next_pending_event() -> dict | None:
@@ -100,6 +175,7 @@ def claim_next_pending_event() -> dict | None:
         ],
         return_document=ReturnDocument.AFTER,
     )
+
 
 def mark_event_processing(event_id: str) -> bool:
     events_collection = get_events_collection()
@@ -195,7 +271,11 @@ def retry_failed_event(
     if retry_count >= max_retries:
         return False
 
-    delay_seconds = 2 ** (retry_count - 1) if retry_count > 0 else 1
+    delay_seconds = (
+        2 ** (retry_count - 1)
+        if retry_count > 0
+        else 1
+    )
 
     next_retry_at = datetime.now(timezone.utc) + timedelta(
         seconds=delay_seconds

@@ -1,14 +1,20 @@
 const nav = [
   { id: 'overview', icon: '⌂', label: 'Overview' },
   { id: 'transactions', icon: '▤', label: 'Transactions' },
-  { id: 'payment_links', icon: '↗', label: 'Payment Links' },
+  // { id: 'payment_links', icon: '↗', label: 'Payment Links' },
   { id: 'reconciliation', icon: '⇄', label: 'Reconciliation' },
   { id: 'refunds', icon: '↩', label: 'Refunds' },
   { id: 'retries', icon: '↻', label: 'Retries' },
   { id: 'investigations', icon: '!', label: 'Investigations' },
+  { id: 'event_operations', icon: '◉', label: 'Event Operations' },
 ]
 
-export default function Sidebar({ activePage, onNavigate, collapsed, onToggle }) {
+export default function Sidebar({
+  activePage,
+  onNavigate,
+  collapsed,
+  onToggle,
+}) {
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       {/* Brand */}
@@ -31,16 +37,23 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
       )}
 
       {/* Navigation */}
-      <nav className="sidebar-nav" aria-label="Primary navigation">
+      <nav
+        className="sidebar-nav"
+        aria-label="Primary navigation"
+      >
         {nav.map(item => (
           <button
             key={item.id}
             type="button"
-            className={`nav-item ${activePage === item.id ? 'active' : ''}`}
+            className={`nav-item ${
+              activePage === item.id ? 'active' : ''
+            }`}
             onClick={() => onNavigate(item.id)}
             title={collapsed ? item.label : ''}
           >
-            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-icon">
+              {item.icon}
+            </span>
 
             {!collapsed && (
               <span className="nav-label">
@@ -70,8 +83,16 @@ export default function Sidebar({ activePage, onNavigate, collapsed, onToggle })
         type="button"
         className="sidebar-toggle"
         onClick={onToggle}
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={
+          collapsed
+            ? 'Expand sidebar'
+            : 'Collapse sidebar'
+        }
+        aria-label={
+          collapsed
+            ? 'Expand sidebar'
+            : 'Collapse sidebar'
+        }
       >
         {collapsed ? '›' : '‹'}
       </button>

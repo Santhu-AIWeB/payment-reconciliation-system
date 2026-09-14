@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
+from backend.app.database import get_db
 from backend.app.events.consumer import (
     process_next_event,
     process_pending_events,
@@ -10,6 +11,33 @@ router = APIRouter(
     prefix="/api/events",
     tags=["Event Consumer"],
 )
+
+
+@router.get("")
+def get_events(limit: int = 100):
+    """
+    Return recent payment events for the Event Operations page.
+    """
+
+    if limit < 1 or limit > 500:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="limit must be between 1 and 500.",
+        )
+
+    db = get_db()
+
+    events = list(
+        db["payment_events"]
+        .find(
+            {},
+            {"_id": 0},
+        )
+        .sort("created_at", -1)
+        .limit(limit)
+    )
+
+    return events
 
 
 @router.post("/process-next")

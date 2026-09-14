@@ -41,6 +41,24 @@ services:
       - mongodb
       - rabbitmq
 
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: payment-worker
+    restart: unless-stopped
+    command: python -m backend.app.events.worker
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017
+      DB_NAME: payment_reconciliation_db
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: payment_user
+      RABBITMQ_PASSWORD: payment_password
+    depends_on:
+      - mongodb
+      - rabbitmq
+
   frontend:
     build:
       context: ./frontend
@@ -51,6 +69,47 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+  payment_frontend:
+    build:
+      context: ./payment_frontend
+      dockerfile: Dockerfile
+    container_name: payment-customer-frontend
+    restart: unless-stopped
+    ports:
+      - "5174:5173"
+    depends_on:
+      - backend
+      - gateway_server
+
+  bank_server:
+    build:
+      context: ./bank_server
+      dockerfile: Dockerfile
+    container_name: payment-bank-server
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017
+      DB_NAME: payment_reconciliation_db
+    depends_on:
+      - mongodb
+
+  gateway_server:
+    build:
+      context: ./gateway_server
+      dockerfile: Dockerfile
+    container_name: payment-gateway-server
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      BACKEND_URL: http://backend:8000
+      BANK_SERVER_URL: http://bank_server:8001
+    depends_on:
+      - backend
+      - bank_server
 
 volumes:
   mongodb_data:

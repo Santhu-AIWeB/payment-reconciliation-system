@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from backend.app.events.schemas import EventType, PaymentEvent
-from backend.app.events.service import publish_event
+from backend.app.events.publisher import DualWriteEventPublisher
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -27,21 +27,25 @@ from backend.app.schemas import (
     ActionRequired,
 )
 
+
 router = APIRouter(
     prefix="/api/payment-links",
     tags=["Payment Links"],
 )
+
 
 FRONTEND_BASE_URL = os.getenv(
     "FRONTEND_BASE_URL",
     "http://localhost:5173",
 ).rstrip("/")
 
+
 PAYMENT_LINK_EXPIRY_HOURS = 24
 
 
 class PaymentProcessRequest(BaseModel):
     """Customer payment simulation request."""
+
     outcome: GatewayOutcome
 
 
@@ -71,13 +75,16 @@ def build_payment_url(link_id: str) -> str:
 
 def normalize_utc_datetime(value: datetime) -> datetime:
     """Normalize MongoDB datetimes to timezone-aware UTC."""
+
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
+
     return value.astimezone(timezone.utc)
 
 
 def simulation_state(outcome: GatewayOutcome):
     """Map customer-selected outcome to gateway, bank and reconciliation states."""
+
     if outcome == GatewayOutcome.SUCCESS:
         return {
             "gateway_status": GatewayOutcome.SUCCESS.value,
@@ -156,6 +163,7 @@ def create_payment_link(
     try:
         transactions_collection.insert_one(transaction_doc)
         links_collection.insert_one(link_doc)
+
     except DuplicateKeyError:
         try:
             transactions_collection.delete_one(
@@ -168,6 +176,7 @@ def create_payment_link(
             status_code=status.HTTP_409_CONFLICT,
             detail="Unable to create a unique payment link. Please retry.",
         )
+
     except PyMongoError as err:
         try:
             transactions_collection.delete_one(
@@ -181,9 +190,9 @@ def create_payment_link(
             detail=f"Database error while creating payment link: {str(err)}",
         )
 
-    # Phase 2B.1:
-    # Publish PAYMENT_CREATED only after the transaction and
-    # payment link have been successfully persisted.
+    # Phase 2H:
+    # Persist the PAYMENT_CREATED event in MongoDB
+    # and publish the same event to RabbitMQ.
     event = PaymentEvent(
         event_id=f"EVT-{uuid.uuid4().hex[:12].upper()}",
         event_type=EventType.PAYMENT_CREATED,
@@ -196,7 +205,7 @@ def create_payment_link(
         correlation_id=transaction_id,
     )
 
-    publish_event(event)
+    DualWriteEventPublisher().publish(event)
 
     return link_doc
 
@@ -259,14 +268,20 @@ def get_payment_link(
             ):
                 collection.update_one(
                     {"link_id": link_id},
-                    {"$set": {"status": PaymentLinkStatus.EXPIRED.value}},
+                    {
+                        "$set": {
+                            "status": PaymentLinkStatus.EXPIRED.value
+                        }
+                    },
                 )
+
                 doc["status"] = PaymentLinkStatus.EXPIRED.value
 
         return doc
 
     except HTTPException:
         raise
+
     except PyMongoError as err:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -289,6 +304,7 @@ def process_payment(
 
     Selected outcome controls the gateway result while the simulator
     intentionally uses a DEBITED bank result for the three Step 8B cases:
+
       SUCCESS -> MATCHED
       FAILED  -> MISMATCH + REFUND
       TIMEOUT -> MISMATCH + INVESTIGATE
@@ -309,7 +325,11 @@ def process_payment(
         if link.get("status") != PaymentLinkStatus.ACTIVE.value:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Payment link is {link.get('status', 'UNAVAILABLE')} and cannot be paid.",
+                detail=(
+                    f"Payment link is "
+                    f"{link.get('status', 'UNAVAILABLE')} "
+                    f"and cannot be paid."
+                ),
             )
 
         now = datetime.now(timezone.utc)
@@ -321,7 +341,11 @@ def process_payment(
             if expires_at <= now:
                 links_collection.update_one(
                     {"link_id": link_id},
-                    {"$set": {"status": PaymentLinkStatus.EXPIRED.value}},
+                    {
+                        "$set": {
+                            "status": PaymentLinkStatus.EXPIRED.value
+                        }
+                    },
                 )
 
                 raise HTTPException(
@@ -384,6 +408,93 @@ def process_payment(
         bank_collection.insert_one(bank_doc)
         reconciliation_collection.insert_one(reconciliation_doc)
 
+        # Phase 2H:
+        # Publish gateway, bank and reconciliation events
+        # through the dual-write publisher.
+        publisher = DualWriteEventPublisher()
+
+        gateway_event = PaymentEvent(
+            event_id=f"EVT-{uuid.uuid4().hex[:12].upper()}",
+            event_type=EventType.GATEWAY_PROCESSED,
+            transaction_id=transaction_id,
+            payload={
+                "gateway_reference": gateway_doc["gateway_reference"],
+                "amount": gateway_doc["amount"],
+                "status": gateway_doc["status"],
+                "response_message": gateway_doc["response_message"],
+            },
+            correlation_id=transaction_id,
+        )
+
+        publisher.publish(gateway_event)
+
+        bank_event = PaymentEvent(
+            event_id=f"EVT-{uuid.uuid4().hex[:12].upper()}",
+            event_type=EventType.BANK_PROCESSED,
+            transaction_id=transaction_id,
+            payload={
+                "bank_reference": bank_doc["bank_reference"],
+                "amount": bank_doc["amount"],
+                "status": bank_doc["status"],
+                "response_message": bank_doc["response_message"],
+            },
+            correlation_id=transaction_id,
+        )
+
+        publisher.publish(bank_event)
+
+        reconciliation_event = PaymentEvent(
+            event_id=f"EVT-{uuid.uuid4().hex[:12].upper()}",
+            event_type=EventType.RECONCILIATION_REQUIRED,
+            transaction_id=transaction_id,
+            payload={
+                "gateway_status": reconciliation_doc["gateway_status"],
+                "bank_status": reconciliation_doc["bank_status"],
+                "reconciliation_status": (
+                    reconciliation_doc["reconciliation_status"]
+                ),
+                "action_required": reconciliation_doc["action_required"],
+                "reason": reconciliation_doc["reason"],
+            },
+            correlation_id=transaction_id,
+        )
+
+        publisher.publish(reconciliation_event)
+
+        # FAILED payment → REFUND_REQUIRED
+        if state["action_required"] == ActionRequired.REFUND.value:
+            refund_event = PaymentEvent(
+                event_id=f"EVT-{uuid.uuid4().hex[:12].upper()}",
+                event_type=EventType.REFUND_REQUIRED,
+                transaction_id=transaction_id,
+                payload={
+                    "amount": amount,
+                    "reason": state["reason"],
+                    "gateway_status": state["gateway_status"],
+                    "bank_status": state["bank_status"],
+                },
+                correlation_id=transaction_id,
+            )
+
+            publisher.publish(refund_event)
+
+        # TIMEOUT payment → INVESTIGATION_REQUIRED
+        if state["action_required"] == ActionRequired.INVESTIGATE.value:
+            investigation_event = PaymentEvent(
+                event_id=f"EVT-{uuid.uuid4().hex[:12].upper()}",
+                event_type=EventType.INVESTIGATION_REQUIRED,
+                transaction_id=transaction_id,
+                payload={
+                    "amount": amount,
+                    "reason": state["reason"],
+                    "gateway_status": state["gateway_status"],
+                    "bank_status": state["bank_status"],
+                },
+                correlation_id=transaction_id,
+            )
+
+            publisher.publish(investigation_event)
+
         transactions_collection.update_one(
             {"transaction_id": transaction_id},
             {
@@ -432,11 +543,13 @@ def process_payment(
 
     except HTTPException:
         raise
+
     except DuplicateKeyError as err:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Payment processing created a duplicate record: {str(err)}",
         )
+
     except PyMongoError as err:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

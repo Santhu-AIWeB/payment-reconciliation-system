@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from backend.app.events.schemas import EventType, PaymentEvent
-from backend.app.events.service import publish_event
+from backend.app.events.publisher import DualWriteEventPublisher
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from pymongo.errors import PyMongoError, DuplicateKeyError
@@ -225,6 +225,6 @@ def process_reconciliation(
         correlation_id=payload.transaction_id,
     )
 
-    publish_event(event)
+    DualWriteEventPublisher().publish(event)
 
     return rec_doc
