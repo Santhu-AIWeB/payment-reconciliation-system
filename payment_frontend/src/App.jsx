@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 
-const API_BASE = 'http://localhost:8002'
+const API_BASE = 'https://payment-reconciliation-gateway.onrender.com'
 
 const CURRENCIES = [
   { code: 'INR', symbol: '₹' },
