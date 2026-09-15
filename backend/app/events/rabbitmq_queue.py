@@ -25,6 +25,8 @@ class RabbitMQEventQueue(EventQueue):
     DLQ_ROUTING_KEY = "payment.event.dead"
 
     def __init__(self) -> None:
+        self.url = os.getenv("RABBITMQ_URL")
+
         self.host = os.getenv("RABBITMQ_HOST", "localhost")
         self.port = int(os.getenv("RABBITMQ_PORT", "5672"))
         self.username = os.getenv(
@@ -37,16 +39,21 @@ class RabbitMQEventQueue(EventQueue):
         )
 
     def _connect(self):
-        credentials = pika.PlainCredentials(
-            self.username,
-            self.password,
-        )
+        if self.url:
+            parameters = pika.URLParameters(
+                self.url,
+            )
+        else:
+            credentials = pika.PlainCredentials(
+                self.username,
+                self.password,
+            )
 
-        parameters = pika.ConnectionParameters(
-            host=self.host,
-            port=self.port,
-            credentials=credentials,
-        )
+            parameters = pika.ConnectionParameters(
+                host=self.host,
+                port=self.port,
+                credentials=credentials,
+            )
 
         return pika.BlockingConnection(parameters)
 
