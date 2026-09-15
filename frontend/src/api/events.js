@@ -1,5 +1,4 @@
-const API_BASE = 'http://localhost:8000'
-
+const API_BASE = 'https://payment-reconciliation-system-k1ry.onrender.com'
 export async function fetchEvents() {
   const response = await fetch(`${API_BASE}/api/events`)
 
