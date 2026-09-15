@@ -6,7 +6,7 @@ import time
 PORT = os.getenv("PORT", "8000")
 
 worker = subprocess.Popen(
-    [sys.executable, "-m", "backend.app.events.worker"],
+    [sys.executable, "-u", "-m", "backend.app.events.worker"],
     env=os.environ.copy(),
 )
 
